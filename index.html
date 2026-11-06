@@ -80,6 +80,8 @@ input#joinCode:focus { outline: none; border-color: var(--gold); }
 .card .face { width: 100%; height: auto; border-radius: 8px; background: #0b0f2e; }
 .card .cn { font-family: var(--f-display); font-size: 15px; } .card .cn small { font-size: 11px; color: var(--muted); }
 .card .cr { font-size: 10px; letter-spacing: 1.4px; color: var(--muted); font-weight: 700; }
+.card .cr u { text-decoration: none; background: var(--gold); color: #1a1030; border-radius: 4px; padding: 0 4px; margin-left: 4px; letter-spacing: .5px; }
+.card .pk { font-size: 10px; line-height: 1.3; color: #9ff3e0; }
 .card .bars { display: grid; gap: 2px; margin: 2px 0; }
 .card .bars i { display: grid; grid-template-columns: 46px 1fr; align-items: center; gap: 4px; font-style: normal; }
 .card .bars em { font-style: normal; font-size: 9px; letter-spacing: 1px; color: var(--muted); }
@@ -151,6 +153,8 @@ table.st td.hi { color: var(--gold); font-weight: 700; } table.st td.mr { font-s
       <b>BLOK</b><span>Tekan di dekat net saat lawan lompat untuk spike. Tahan tombol untuk blok lebih tinggi. Spike dari titik tinggi lebih sulit diblok.</span>
       <b>TERIMA</b><span>Tap saat lawan memukul. Sambil dorong joystick ke samping = dive untuk SAVE.</span>
       <b>SERVIS</b><span>Geser posisi dulu. SPIKE = lempar bola untuk jump serve: lari mengejar bola, tekan dan tahan SPIKE untuk lompat, lepas untuk memukul. Lari kencang sebelum lompat = servis lebih keras. TIP = float serve: tahan SPIKE, lepas saat bola turun ke tangan.</span>
+      <b>AKIRA</b><span>Serve master: TAHAN SPIKE untuk mengisi kekuatan lemparan (makin lama makin tinggi &amp; jauh), arahkan joystick kiri/kanan untuk arah lemparan, lalu lepas. Lari panjang, lompat, dan saat memukul: joystick ↑ = servis dalam, ↓ = pendek, tahan lebih lama = lebih keras.</span>
+      <b>TAKA &amp; HAYATE</b><span>TAKA melompat paling tinggi dan melayang lebih lama kalau tombol ditahan. HAYATE paling cepat untuk lari dan dive.</span>
     </div>
     <p class="small">Lingkaran emas bertuliskan LOMPAT! muncul saat umpan datang. Lompat di situ, lalu pukul di puncak lompatan.<br>Keyboard: A/D gerak · W/S arah · J spike · K terima · L blok · I tip · Esc jeda.</p>
     <div class="row" style="margin-top:12px"><button class="big dark" id="bHowBack" type="button">Kembali</button></div>
@@ -220,12 +224,12 @@ table.st td.hi { color: var(--gold); font-weight: 700; } table.st td.mr { font-s
 <script>if (!window.mqtt) document.write('<script src="https://unpkg.com/mqtt@4.3.7/dist/mqtt.min.js"><\/script>');</script>
 <script>
 // ===== SIM v3 (murni, tanpa DOM) =====
-const W = 1200, H = 540, GY = 468, NET = 600, NT = 318, BR = 10, G = 0.32, AG = 0.62, LEFT = 60, RIGHT = 1140;
-const SC = 1.25; // skala jarak horizontal dibanding versi lama
+const W = 1440, H = 540, GY = 468, NET = 720, NT = 318, BR = 10, G = 0.32, AG = 0.62, LEFT = 72, RIGHT = 1368;
+const SC = 1.5, CK = SC / 1.25; // CK: skala kecepatan/jarak relatif versi sebelumnya // skala jarak horizontal dibanding versi lama
 function sx(v) { return NET + (v - 480) * SC; } // konversi koordinat lama tim kiri
 const HAND_Y = 96;
-const HOME = [375, 531, 238];
-const QUICK_D = 140, PIPE_D = 350;          // jarak dari net yang menentukan tipe serangan
+const HOME = [sx(300), sx(424.8), sx(190.4)];
+const QUICK_D = 168, PIPE_D = 420;          // jarak dari net yang menentukan tipe serangan
 const NOIN = { mx: 0, my: 0, bh: false, sh: false, p: { spike: 0, tip: 0, block: 0, recv: 0 } };
 // karakter: stat + kemampuan spesial (karakter original)
 const CHARS = [
@@ -234,7 +238,10 @@ const CHARS = [
   { name: 'SORA', num: 11, role: 'SKY JUMPER', skin: '#e0ac69', spd: 1.0, jmp: 1.1, pow: 1.0, rcv: 0.95, blk: 1.05, sp: 'sky', spName: 'SKY DRIVE', spDesc: 'Spike PERFECT menghantam lurus ke bawah dari langit' },
   { name: 'HARU', num: 9, role: 'IRON WALL', skin: '#8d5524', spd: 0.95, jmp: 1.05, pow: 1.0, rcv: 0.95, blk: 1.3, sp: 'wall', spName: 'IRON WALL', spDesc: 'Blok berikutnya jadi tembok raksasa yang pasti mematikan' },
   { name: 'YUKI', num: 2, role: 'TRICKSTER', skin: '#ffdbac', spd: 1.05, jmp: 1.0, pow: 0.95, rcv: 1.15, blk: 1.0, sp: 'shadow', spName: 'SHADOW FEINT', spDesc: 'TIP jadi bola bayangan cepat ke sudut belakang' },
-  { name: 'GIN', num: 14, role: 'GUARDIAN', skin: '#d4a373', spd: 1.1, jmp: 0.95, pow: 0.95, rcv: 1.25, blk: 0.95, sp: 'guard', spName: 'GUARDIAN SAVE', spDesc: 'Terima bola berikutnya pasti sempurna, lalu serangan balik lebih keras' }
+  { name: 'GIN', num: 14, role: 'GUARDIAN', skin: '#d4a373', spd: 1.1, jmp: 0.95, pow: 0.95, rcv: 1.25, blk: 0.95, sp: 'guard', spName: 'GUARDIAN SAVE', spDesc: 'Terima bola berikutnya pasti sempurna, lalu serangan balik lebih keras' },
+  { name: 'AKIRA', num: 1, role: 'SERVE MASTER', skin: '#f1c27d', spd: 1.0, jmp: 1.02, pow: 1.05, rcv: 1.0, blk: 0.95, srv: 1, sp: 'cannon', spName: 'CANNON SERVE', spDesc: 'Servis jadi meriam super cepat yang hampir mustahil diterima', perk: 'Atur lemparan, arah & kekuatan servis, ancang-ancang lari lebih panjang' },
+  { name: 'TAKA', num: 10, role: 'HIGH FLYER', skin: '#e0ac69', spd: 0.95, jmp: 1.3, pow: 1.0, rcv: 0.9, blk: 1.1, hang: 1, sp: 'hawk', spName: 'HAWK SOAR', spDesc: 'Lompatan raksasa: spike dari puncak menembus blok', perk: 'Lompatan paling tinggi, melayang lebih lama saat tombol ditahan' },
+  { name: 'HAYATE', num: 5, role: 'LIGHTNING', skin: '#c68642', spd: 1.42, jmp: 0.95, pow: 0.92, rcv: 1.1, blk: 0.9, sp: 'flash', spName: 'FLASH STRIKE', spDesc: 'Spike bagus jadi sambaran petir super cepat', perk: 'Lari & dive tercepat, kejar bola mana pun' }
 ];
 const BASE_CS = { spd: 1, jmp: 1, pow: 1, rcv: 1, blk: 1 };
 function mx(t, x) { return t ? W - x : x; }
@@ -257,7 +264,7 @@ function newState(o) {
   const s = {
     tick: 0, phase: 'ready', timer: 100, score: [0, 0], target: o.target || 5, serveTeam: 0,
     touches: [0, 0], lastTeam: 0, lastToucher: -1, touchT: 0, rallyTouches: 0, lastAction: '',
-    freeze: 0, slow: 0, events: [], evId: 0, winner: -1, serveStage: 0, serveT: 0, tossT: 0, serveKind: 'jump',
+    freeze: 0, slow: 0, events: [], evId: 0, winner: -1, serveStage: 0, serveT: 0, tossT: 0, tossCh: 0, serveKind: 'jump',
     seed: o.seed || 1234567, ctrl: o.ctrl, assist: o.assist || [true, true], skill: o.skill == null ? 1 : o.skill,
     chaser: [-1, -1], crossT: 0, lastPointTeam: -1, aiServeJ: 28,
     chars: o.chars || [0, 3], spc: [CHARS[(o.chars || [0, 3])[0]].sp, CHARS[(o.chars || [0, 3])[1]].sp],
@@ -267,7 +274,7 @@ function newState(o) {
     ball: { x: 0, y: 0, vx: 0, vy: 0, spin: 0, held: true, fast: 0, perfect: 0, side: 0, atk: 0, sup: 0, flt: 0 },
     ath: []
   };
-  const used = [s.chars[0], s.chars[1]], rest = [0, 1, 2, 3, 4, 5].filter(c => used.indexOf(c) < 0);
+  const used = [s.chars[0], s.chars[1]], rest = CHARS.map((c, i) => i).filter(c => used.indexOf(c) < 0);
   const looks = [s.chars[0], rest[0], rest[1], s.chars[1], rest[2] != null ? rest[2] : rest[0], rest[3] != null ? rest[3] : rest[1]];
   for (let t = 0; t < 2; t++) for (let r = 0; r < 3; r++) s.ath.push({
     look: looks[t * 3 + r], cs: r === 0 ? CHARS[looks[t * 3]] : BASE_CS, iron: 0, guard: 0,
@@ -286,10 +293,10 @@ function placeForServe(s) {
     a.x = mx(a.team, HOME[a.role]); a.y = GY; a.vx = 0; a.vy = 0; a.ground = true; a.st = 'idle';
     a.swing = 0; a.stance = 0; a.dive = 0; a.hitDone = false; a.land = 0; a.cele = 0; a.setT = 0; a.airT = 0; a.bufJ = 0; a.flip = 0; a.wind = 0;
   }
-  s.ath[t * 3].x = mx(t, 80);
+  s.ath[t * 3].x = mx(t, LEFT + 24);
   const b = s.ball;
   b.held = true; b.vx = 0; b.vy = 0; b.fast = 0; b.perfect = 0; b.side = t; b.atk = 0; b.sup = 0; b.flt = 0;
-  s.serveStage = 0; s.serveT = 0; s.touches = [0, 0]; s.chaser = [-1, -1]; s.lastToucher = -1; s.serveKind = 'jump';
+  s.serveStage = 0; s.serveT = 0; s.tossCh = 0; s.touches = [0, 0]; s.chaser = [-1, -1]; s.lastToucher = -1; s.serveKind = 'jump';
   s.rallyN = 0; s.setType = ['', '']; s.attacker = [0, 3]; s.firstTouch = [-1, -1]; s.slow = 0;
   b.x = s.ath[t * 3].x + dirOf(t) * 12; b.y = GY - 62;
   savePrev(s);
@@ -355,7 +362,7 @@ function registerTouch(s, a) {
 
 function pointTo(s, win, why) {
   if (s.phase !== 'rally' && s.phase !== 'serve') return;
-  if (s.rallyTouches === 0 && win === s.lastTeam && s.lastAction === 'serve') { why = 'ACE!'; addFever(s, win, 12); }
+  if (s.rallyTouches === 0 && win === s.lastTeam && s.lastAction === 'serve') { why = s.ball.sup === 7 ? 'CANNON ACE!' : 'ACE!'; addFever(s, win, 12); }
   addFever(s, win, 4);
   if (s.rallyN >= 6) why = (why || '') + '  ·  RALLY ' + s.rallyN;
   if (win === s.lastTeam && s.lastToucher >= 0) {
@@ -434,13 +441,13 @@ function updateAthlete(s, a, inp, dt) {
 
   if (!a.ground) {
     let held = false;
-    if (a.vy < 0 && a.airT <= 16 && (a.jk === 'spike' || a.jk === 'block')) {
+    if (a.vy < 0 && a.airT <= (a.cs.hang ? 22 : 16) && (a.jk === 'spike' || a.jk === 'block')) {
       held = human ? (a.jk === 'block' ? I.bh : I.sh) : a.airT < a.aiHold;
     }
     const g = held ? AG * 0.5 : (Math.abs(a.vy) < 2.2 ? AG * 0.5 : AG);
     a.vy += g * dt; a.x += a.vx * dt; a.y += a.vy * dt; a.airT++;
     if (a.y >= GY) {
-      a.y = GY; a.vy = 0; a.ground = true; a.land = 8; a.blockUsed = false; a.iron = 0; a.airT = 0; a.wind = 0; a.jk = ''; a.jumpHeld = false;
+      a.y = GY; a.vy = 0; a.ground = true; a.land = 8; a.blockUsed = false; a.iron = 0; a.airT = 0; a.wind = 0; a.jk = ''; a.jumpHeld = false; a.hawk = 0;
       if (a.dive <= 0) a.st = 'idle';
       if (!isServer) a.vx *= 0.4;
       emit(s, 'land', { x: a.x, big: a.flip > 0 ? 1 : 0 });
@@ -452,7 +459,7 @@ function updateAthlete(s, a, inp, dt) {
   }
   if (a.dive > 0) { a.dive--; if (a.ground) a.vx *= 0.9; if (a.dive === 0) a.st = 'idle'; }
   if (t === 0) a.x = clamp(a.x, 24, NET - 20); else a.x = clamp(a.x, NET + 20, W - 24);
-  if (isServer && a.ground) a.x = t === 0 ? clamp(a.x, 24, LEFT + 150) : clamp(a.x, RIGHT - 150, W - 24);
+  if (isServer && a.ground) { const run = a.cs.srv ? 340 : 180; a.x = t === 0 ? clamp(a.x, 24, LEFT + run) : clamp(a.x, RIGHT - run, W - 24); }
   if (a.ground && a.dive <= 0 && a.swing <= 0 && a.stance <= 0 && a.setT <= 0 && !isServer) {
     a.st = Math.abs(a.vx) > 0.6 ? 'run' : 'idle';
   }
@@ -473,9 +480,10 @@ function moveToward(a, goal, speed) {
 }
 
 function jumpSpike(s, a, vx) {
-  const toward = clamp(a.vx * dirOf(a.team) / 5, 0, 1);
+  const toward = clamp(a.vx * dirOf(a.team) / (5 * CK), 0, 1);
   a.appr = toward;
-  a.vy = (-10.9 - toward * 1.2) * a.cs.jmp; a.ground = false; a.vx = vx != null ? vx : a.vx * 0.7; a.st = 'air'; a.hitDone = false; a.airT = 0; a.bufJ = 0; a.jk = 'spike'; a.wind = 0;
+  a.vy = (-10.9 - toward * 1.2) * a.cs.jmp;
+  if (s.phase === 'rally' && a.role === 0 && s.touches[a.team] === 2 && s.ball.side === a.team && useSpecial(s, a.team, a.team * 3, 'hawk')) { a.hawk = 1; a.vy *= 1.22; s.freeze = 40; a.flip = 40; } a.ground = false; a.vx = vx != null ? vx : a.vx * 0.7; a.st = 'air'; a.hitDone = false; a.airT = 0; a.bufJ = 0; a.jk = 'spike'; a.wind = 0;
   emit(s, 'jump', { x: a.x, team: a.team, big: toward > 0.5 ? 1 : 0 });
 }
 function blockJump(s, a, vy) {
@@ -487,6 +495,8 @@ function startSwing(a, tip, my, pow) {
   a.swing = 16; a.swingAge = 0; a.tip = tip; a.my = my; a.st = tip ? 'tip' : 'spike'; a.pow = pow == null ? 1 : pow; a.wind = 0;
 }
 function windPow(w) { return 0.8 + 0.35 * Math.min(1, Math.max(0, w - 1) / 13); }
+// titik jatuh servis yang dibidik (koordinat tim kiri), u: -1 pendek ... 1 jauh
+function serveAimX(t, u) { const x = sx(525 + (clamp(u, -1, 1) + 1) / 2 * 370); return t ? W - x : x; }
 // satu gerakan: tekan = lompat, tahan = makin tinggi + ancang-ancang, lepas = pukul
 function humanJumpHold(s, a, I) {
   if (!a.jumpHeld) return false;
@@ -517,7 +527,7 @@ function humanAirSwing(s, a, I, allowGround) {
 function serverControl(s, a, I) {
   const t = a.team, dir = dirOf(t), b = s.ball;
   if (s.serveStage === 0) {
-    if (I) a.vx += (I.mx * 4 - a.vx) * 0.3; else a.vx *= 0.7;
+    if (I) a.vx += (I.mx * 4 * CK - a.vx) * 0.3; else a.vx *= 0.7;
     a.st = Math.abs(a.vx) > 0.6 ? 'run' : 'serve';
     return;
   }
@@ -534,11 +544,11 @@ function serverControl(s, a, I) {
   // jump serve: bebas lari mengejar lemparan, lalu lompat
   if (I) {
     if (a.ground) {
-      a.vx += (I.mx * 5.6 - a.vx) * 0.3;
+      a.vx += (I.mx * 5.6 * CK * a.cs.spd * (a.cs.srv ? 1.12 : 1) - a.vx) * 0.3;
       if (I.p.spike) { jumpSpike(s, a); a.jumpHeld = true; }
       else a.st = Math.abs(a.vx) > 0.6 ? 'run' : 'serve';
     } else {
-      a.vx = clamp(a.vx + I.mx * 0.14, -6, 6);
+      a.vx = clamp(a.vx + I.mx * 0.14 * CK, -6 * CK, 6 * CK);
       if (!humanJumpHold(s, a, I)) humanAirSwing(s, a, I, false);
     }
     return;
@@ -546,7 +556,7 @@ function serverControl(s, a, I) {
   if (a.ground) {
     const p = predictY(b, 258);
     const stand = p.x - dir * 16;
-    const tv = clamp((stand - a.x) * 0.25, -5.6, 5.6);
+    const tv = clamp((stand - a.x) * 0.25, -5.6 * CK, 5.6 * CK);
     a.vx += (tv - a.vx) * 0.35;
     a.st = Math.abs(a.vx) > 0.6 ? 'run' : 'serve';
     if (b.vy > -3 && p.t >= 12 && p.t <= 15) { a.aiHold = 13 + Math.floor(rnd(s) * 4); jumpSpike(s, a); }
@@ -561,7 +571,7 @@ function pointControl(s, a, I) {
     a.vy = -6.8; a.ground = false; a.st = 'cele'; a.cele = 40; a.vx = 0;
   }
   if (a.ground) {
-    if (I) a.vx += (I.mx * 5.8 - a.vx) * 0.4;
+    if (I) a.vx += (I.mx * 5.8 * CK - a.vx) * 0.4;
     else moveToward(a, mx(a.team, HOME[a.role]), 2.5);
   }
 }
@@ -582,17 +592,17 @@ function humanControl(s, a, I) {
   if (a.dive > 0) return;
   const am = Math.abs(I.mx);
   if (a.ground) {
-    let tv = I.mx * 6.4 * a.cs.spd;
+    let tv = I.mx * 6.4 * CK * a.cs.spd;
     if (s.assist[a.team] && am < 0.2) {
       const g = attackGoal(s, a);
-      if (g !== null) tv = Math.abs(g - a.x) < 2 ? 0 : clamp((g - a.x) * 0.25, -6.4, 6.4);
+      if (g !== null) tv = Math.abs(g - a.x) < 2 ? 0 : clamp((g - a.x) * 0.25, -6.4 * CK * a.cs.spd, 6.4 * CK * a.cs.spd);
     }
     if (a.stance > 0) tv *= 0.35;
     if (a.land > 4) tv *= 0.6;
     const k = Math.abs(tv) > Math.abs(a.vx) ? 0.32 : 0.25;
     a.vx += (tv - a.vx) * k;
     if (tv === 0 && Math.abs(a.vx) < 0.05) a.vx = 0;
-  } else a.vx = clamp(a.vx + I.mx * 0.18, -7, 7);
+  } else a.vx = clamp(a.vx + I.mx * 0.18 * CK * Math.sqrt(a.cs.spd), -7 * CK, 7 * CK);
 
   let acted = false;
   if (!a.ground) {
@@ -604,7 +614,7 @@ function humanControl(s, a, I) {
   if (!acted && I.p.block && a.ground) { blockJump(s, a, -9.4); acted = true; }
   if (!acted && I.p.recv && a.ground) {
     if (am > 0.55) {
-      a.dive = 24; a.vx = Math.sign(I.mx) * 10.4 * a.cs.spd; a.st = 'dive'; a.stance = 24; a.stanceAge = 0;
+      a.dive = 24; a.vx = Math.sign(I.mx) * 10.4 * CK * a.cs.spd; a.st = 'dive'; a.stance = 24; a.stanceAge = 0;
       emit(s, 'dive', { x: a.x });
     } else { a.stance = 22; a.stanceAge = 0; a.st = 'recv'; }
   }
@@ -637,7 +647,7 @@ function doSpike(s, a, q) {
     return;
   }
   if (a.tip) {
-    const tx = NET + dir * (75 + rnd(s) * 90);
+    const tx = NET + dir * (75 + rnd(s) * 90) * CK;
     arcTo(b, tx, GY - BR, Math.min(b.y - 40, NT - 46));
     const r = simLand(b.x, b.y, b.vx, b.vy);
     if (r.net) arcTo(b, tx, GY - BR, NT - 80);
@@ -657,11 +667,13 @@ function doSpike(s, a, q) {
     if (sp === 'meteor' && q === 2) supT = 1;
     else if (sp === 'phantom' && q >= 1) supT = 2;
     else if (sp === 'sky' && q === 2) supT = 3;
+    else if (sp === 'flash' && q >= 1 && a.role === 0) supT = 5;
     if (supT) useSpecial(s, t, t * 3 + a.role, sp);
   }
+  if (a.hawk) { a.hawk = 0; if (q >= 1) supT = 6; }
   const sup = supT > 0;
-  if (supT === 1) speed *= 1.3; else if (supT === 2) speed *= 1.15; else if (supT === 3) speed *= 1.25;
-  let base = supT === 3 ? 44 : 22 + a.my * 13;
+  if (supT === 1) speed *= 1.3; else if (supT === 2) speed *= 1.15; else if (supT === 3) speed *= 1.25; else if (supT === 5) speed *= 1.38; else if (supT === 6) speed *= 1.22;
+  let base = supT === 3 ? 44 : supT === 6 ? 36 + a.my * 8 : 22 + a.my * 13;
   if (pw >= 1.1) base += (rnd(s) - 0.5) * 8;
   const angs = [];
   for (let dg = -14; dg <= 50; dg += 2) angs.push(dg);
@@ -681,7 +693,7 @@ function doSpike(s, a, q) {
   b.vx = dir * speed * Math.cos(r); b.vy = speed * Math.sin(r);
   b.perfect = q === 2 ? 1 : 0;
   if (sup) {
-    b.fast = 120; b.atk = 4; b.sup = supT; s.freeze = 54; s.slow = supT === 2 ? 16 : 26; a.flip = 46; b.dip = 0;
+    b.fast = 120; b.atk = 4; b.sup = supT; s.freeze = supT === 6 ? 30 : 54; s.slow = supT === 2 ? 16 : supT === 5 ? 12 : 26; a.flip = 46; b.dip = 0;
   } else {
     if (q === 2) s.stats[t * 3 + a.role].perf++;
     b.fast = [10, 24, 40][q]; b.atk = q + 1; s.freeze = [0, 2, 7][q];
@@ -711,7 +723,7 @@ function checkReceive(s, a, human) {
     }
     if (b.sup) {
       if (human) q = (!diving && a.stanceAge <= 6) ? 1 : 0;
-      else { if (rnd(s) < 0.86 - s.skill * 0.05) { a.stance = 0; a.blind = 20; b.atk = 0; return; } q = 0; }
+      else { if (rnd(s) < (b.sup === 7 ? 0.62 : 0.86) - s.skill * 0.05) { a.stance = 0; a.blind = 20; b.atk = 0; return; } q = 0; }
     } else {
       if (spd > 15 && q === 2 && rnd(s) < 0.35) q = 1;
       if (spd > 17 && q === 1 && rnd(s) < 0.3) q = 0;
@@ -746,8 +758,8 @@ function doBump(s, a, q, dig, save) {
   let tx = setterDid ? mx(t, sx(380)) : mx(t, HOME[1]);
   let apex;
   if (q === 2) apex = 200;
-  else if (q === 1) { apex = 175 + rnd(s) * 50; tx += (rnd(s) - 0.5) * 125; }
-  else { apex = 110 + rnd(s) * 90; tx += (rnd(s) - 0.5) * 375; }
+  else if (q === 1) { apex = 175 + rnd(s) * 50; tx += (rnd(s) - 0.5) * 125 * CK; }
+  else { apex = 110 + rnd(s) * 90; tx += (rnd(s) - 0.5) * 375 * CK; }
   arcTo(b, tx, GY - HAND_Y, apex);
   b.fast = 0; b.perfect = 0;
   emit(s, 'bump', ev);
@@ -772,12 +784,12 @@ function doSetArc(s, a, q) {
   const atk = s.ath[ai];
   const d = Math.abs(NET - atk.x);
   let type, ax, apex;
-  if (d < QUICK_D) { type = 'quick'; ax = NET - dir * 70; apex = 222; }
-  else if (d > PIPE_D) { type = 'pipe'; ax = NET - dir * clamp(d - 14, 360, 450); apex = 138; }
-  else { type = 'open'; ax = NET - dir * clamp(d - 14, 150, 350); apex = 150; }
+  if (d < QUICK_D) { type = 'quick'; ax = NET - dir * 70 * CK; apex = 222; }
+  else if (d > PIPE_D) { type = 'pipe'; ax = NET - dir * clamp(d - 14, 360 * CK, 450 * CK); apex = 138; }
+  else { type = 'open'; ax = NET - dir * clamp(d - 14, 150 * CK, 350 * CK); apex = 150; }
   s.setType[t] = type;
   const spread = type === 'quick' ? 0.5 : 1;
-  const noise = (q === 2 ? 0 : q === 1 ? (rnd(s) - 0.5) * 60 : (rnd(s) - 0.5) * 180) * spread;
+  const noise = (q === 2 ? 0 : q === 1 ? (rnd(s) - 0.5) * 60 : (rnd(s) - 0.5) * 180) * spread * CK;
   arcTo(b, ax + noise, 258, apex);
   b.fast = 0; b.perfect = 0;
   emit(s, 'call', { team: t, type, x: ax, who: ai });
@@ -829,8 +841,8 @@ function aiControl(s, a) {
       if (s.chaser[t] === i && s.tick - s.crossT >= 7 - s.skill) {
         goal = p.x;
         const dx = Math.abs(p.x - a.x);
-        if (s.slow <= 0 && !(a.blind > 0) && a.ground && a.stance <= 0 && p.t <= 11 && dx > 30 && dx < 130) {
-          a.dive = 24; a.vx = Math.sign(p.x - a.x) * 10.4; a.st = 'dive'; a.stance = 24; a.stanceAge = 0;
+        if (s.slow <= 0 && !(a.blind > 0) && a.ground && a.stance <= 0 && p.t <= 11 && dx > 30 && dx < 130 * CK) {
+          a.dive = 24; a.vx = Math.sign(p.x - a.x) * 10.4 * CK; a.st = 'dive'; a.stance = 24; a.stanceAge = 0;
           a.aiQ = rnd(s) < 0.45 ? 1 : 0;
           emit(s, 'dive', { x: a.x });
           return;
@@ -846,7 +858,7 @@ function aiControl(s, a) {
         const p = predictY(b, GY - HAND_Y - 6);
         goal = p.x;
         if (b.vy > 0 && Math.hypot(b.x - a.x, b.y - (a.y - HAND_Y - 6)) < 30) {
-          if (s.ctrl[t] === 'ai' && Math.abs(a.x - NET) < 120 && rnd(s) < 0.07) {
+          if (s.ctrl[t] === 'ai' && Math.abs(a.x - NET) < 120 * CK && rnd(s) < 0.07) {
             // setter dump: sentuhan kedua langsung ke seberang
             if (registerTouch(s, a)) {
               s.lastAction = 'tip';
@@ -898,7 +910,7 @@ function aiControl(s, a) {
     if (!mine && a.role === 1) {
       const os = s.ath[s.attacker[1 - t]];
       const threat = s.touches[1 - t] >= 1 || !os.ground;
-      if (threat && Math.abs(os.x - NET) < 275) {
+      if (threat && Math.abs(os.x - NET) < 275 * CK) {
         goal = NET - dir * 26;
         if (!os.ground && os.st !== 'block' && os.airT === 1) {
           const typ = s.setType[1 - t], mult = typ === 'quick' ? 0.35 : typ === 'pipe' ? 0.5 : 1;
@@ -921,14 +933,28 @@ function updateServe(s, inp, dt) {
   const I = human ? (inp[t] || NOIN) : null;
   if (s.serveStage === 0) {
     b.x = a.x + dir * 12; b.y = a.y - 62; b.vx = 0; b.vy = 0; b.held = true;
-    let kind = null;
-    if (human) { if (I.p.tip) kind = 'float'; else if (I.p.spike || s.serveT > 480) kind = 'jump'; }
-    else if (s.serveT > 60) kind = rnd(s) < 0.35 ? 'float' : 'jump';
+    let kind = null, ch = -1, td = 0;
+    const master = !!a.cs.srv;
+    if (human) {
+      if (master && !s.tossCh && I.p.tip) kind = 'float';
+      else if (master && (I.sh || s.tossCh > 0)) {
+        // SERVE MASTER: tahan SPIKE = isi kekuatan lemparan, joystick kiri/kanan = arah lemparan, lepas = lempar
+        if (I.sh && s.tossCh < 46) { s.tossCh = (s.tossCh || 0) + 1; a.st = 'serve'; }
+        else if (!I.sh) { ch = clamp((s.tossCh - 1) / 36, 0, 1); td = clamp(I.mx * dir, -1, 1); kind = 'jump'; }
+        if (s.tossCh >= 46 && !kind) { ch = 1; td = clamp(I.mx * dir, -1, 1); kind = 'jump'; }
+      }
+      else if (I.p.tip) kind = 'float';
+      else if (I.p.spike || s.serveT > 480) kind = 'jump';
+      if (!kind && s.serveT > 600) kind = 'jump';
+    }
+    else if (s.serveT > 60) { kind = rnd(s) < (master ? 0.2 : 0.35) ? 'float' : 'jump'; if (master) { ch = 0.3 + rnd(s) * 0.6; td = rnd(s) * 0.8; } }
     if (kind) {
-      s.serveKind = kind; s.serveStage = 1; s.tossT = s.serveT; b.held = false;
+      s.serveKind = kind; s.serveStage = 1; s.tossT = s.serveT; b.held = false; s.tossCh = 0;
       if (kind === 'float') { b.x = a.x + dir * 14; b.vx = dir * 0.2; b.vy = -7.4; }
+      else if (ch >= 0) { b.vx = dir * (0.9 + ch * 1.5 + td * 0.8); b.vy = -(10.2 + ch * 3.8); }
       else { b.vx = dir * 1.6; b.vy = -11.6; }
-      emit(s, 'toss', { x: b.x, y: b.y, team: t, kind });
+      emit(s, 'toss', { x: b.x, y: b.y, team: t, kind, ch: ch >= 0 ? Math.round(ch * 100) : -1 });
+      a.aiAim = rnd(s) < 0.5 ? -0.6 - rnd(s) * 0.4 : rnd(s) * 2 - 1;
       if (!human) {
         a.aiThr = rnd(s) < [0.2, 0.35, 0.5][s.skill] ? 20 : 44;
         s.aiServeJ = 27 + Math.floor(rnd(s) * 6);
@@ -950,14 +976,23 @@ function serveHit(s, a, q) {
   s.touches = [0, 0]; s.lastTeam = t; s.lastToucher = t * 3; s.touchT = s.tick; s.rallyTouches = 0;
   s.phase = 'rally'; b.side = t; s.crossT = s.tick; s.lastAction = 'serve';
   let tx, T;
-  if (fl) {
+  const master = !!a.cs.srv;
+  if (master) {
+    // arah dibidik: joystick atas = jauh ke belakang, bawah = pendek dekat net
+    const u = s.ctrl[t] === 'human' ? clamp(-(a.my || 0), -1, 1) : (a.aiAim || 0);
+    tx = serveAimX(0, u) + (rnd(s) - 0.5) * [150, 50, 14][q];
+    const pm = 1 + ((a.pow || 1) - 1) * 1.2;
+    T = (fl ? [64, 54, 47][q] : [58, 42, 32][q]) / (pm * (1 + (a.appr || 0) * 0.2));
+  } else if (fl) {
     if (q === 2) tx = sx(820 + rnd(s) * 70); else if (q === 1) tx = sx(600 + rnd(s) * 250); else tx = sx(540 + rnd(s) * 150);
     T = (q === 2 ? 50 : q === 1 ? 56 : 66) / (a.pow || 1);
   } else {
     if (q === 2) tx = sx(760 + rnd(s) * 120); else if (q === 1) tx = sx(560 + rnd(s) * 300); else tx = sx(520 + rnd(s) * 200);
     T = (q === 2 ? 32 : q === 1 ? 44 : 62) / ((a.pow || 1) * (1 + (a.appr || 0) * 0.15));
   }
-  T = Math.round(T);
+  let cannon = false;
+  if (q >= 1 && s.fever[t] >= 100 && s.spc[t] === 'cannon' && useSpecial(s, t, t * 3, 'cannon')) { cannon = true; T *= 0.66; }
+  T = Math.max(18, Math.round(T * Math.sqrt(CK)));
   if (t === 1) tx = W - tx;
   let vx = 0, vy = 0;
   for (let k = 0; k < 40; k++) {
@@ -967,6 +1002,11 @@ function serveHit(s, a, q) {
     T += 2;
   }
   b.vx = vx; b.vy = vy;
+  if (cannon) {
+    b.fast = 120; b.perfect = 1; b.atk = 4; b.sup = 7; b.flt = 0; s.freeze = 50; s.slow = 22; a.flip = 40;
+    emit(s, 'serve', { x: b.x, y: b.y, q, team: t, vx: b.vx, vy: b.vy, kind: s.serveKind, pw: Math.round((a.pow || 1) * 100), run: 1, sup: 1, ax: a.x, ay: a.y, who: t * 3 });
+    return;
+  }
   if (fl) { b.fast = 0; b.perfect = 0; b.atk = 0; b.flt = q + 1; s.freeze = q === 2 ? 3 : 0; }
   else { b.fast = q === 2 ? 30 : 12; b.perfect = q === 2 ? 1 : 0; b.atk = q === 2 ? 2 : q === 1 ? 1 : 0; s.freeze = q === 2 ? 5 : 1; }
   emit(s, 'serve', { x: b.x, y: b.y, q, team: t, vx: b.vx, vy: b.vy, kind: s.serveKind, pw: Math.round((a.pow || 1) * 100), run: a.appr > 0.5 ? 1 : 0 });
@@ -1000,7 +1040,7 @@ function updateBall(s, live, dt) {
   }
   if (live) {
     for (const a of s.ath) {
-      if (a.st !== 'block' || a.ground || a.blockUsed) continue;
+      if (a.st !== 'block' || a.ground || a.blockUsed || b.sup === 6) continue;
       const dir = dirOf(a.team);
       if (b.vx * dir >= 0) continue;
       if (!a.iron && (a.airT < 5 || a.airT > 32)) continue;
@@ -1040,7 +1080,7 @@ function updateBall(s, live, dt) {
       if (inC) {
         const win = b.x < NET ? 1 : 0;
         let why = 'Masuk!';
-        if (win === s.lastTeam) why = b.sup ? ['', 'METEOR SPIKE!', 'PHANTOM QUICK!', 'SKY DRIVE!', 'SHADOW FEINT!'][b.sup] : s.lastAction === 'spike' ? (b.perfect ? 'SPIKE SEMPURNA!' : 'Spike masuk!') : s.lastAction === 'block' ? 'KILL BLOCK!' : s.lastAction === 'tip' ? 'Tipuan jitu!' : s.lastAction === 'serve' ? 'ACE!' : 'Masuk!';
+        if (win === s.lastTeam) why = b.sup ? ['', 'METEOR SPIKE!', 'PHANTOM QUICK!', 'SKY DRIVE!', 'SHADOW FEINT!', 'FLASH STRIKE!', 'HAWK SOAR!', 'CANNON SERVE!'][b.sup] : s.lastAction === 'spike' ? (b.perfect ? 'SPIKE SEMPURNA!' : 'Spike masuk!') : s.lastAction === 'block' ? 'KILL BLOCK!' : s.lastAction === 'tip' ? 'Tipuan jitu!' : s.lastAction === 'serve' ? 'ACE!' : 'Masuk!';
         else why = 'Bola jatuh';
         pointTo(s, win, why);
       } else pointTo(s, 1 - s.lastTeam, 'Keluar!');
@@ -1215,9 +1255,9 @@ const TEAM = [
   { main: '#2f86ff', dark: '#1b4fb3', light: '#9cc8ff', hair: '#141a2e', name: 'BIRU' }
 ];
 const GOLD = '#ffd23f';
-const SUPC = [null, ['#fff4b0', '#ff8a1a', '#ff3a10'], ['#ffd6ff', '#c06bff', '#ff4fd8'], ['#ffffff', '#9ff3ff', '#3fa9ff'], ['#d9d0ff', '#6a55c9', '#1a1030']];
+const SUPC = [null, ['#fff4b0', '#ff8a1a', '#ff3a10'], ['#ffd6ff', '#c06bff', '#ff4fd8'], ['#ffffff', '#9ff3ff', '#3fa9ff'], ['#d9d0ff', '#6a55c9', '#1a1030'], ['#ffffff', '#fff36b', '#ffc400'], ['#e9fff6', '#5fffc4', '#00b386'], ['#ffffff', '#ff6b8a', '#d6004a']];
 const KIND = { quick: ['QUICK!', '#7ff0ff'], pipe: ['PIPE!', '#c49bff'], open: ['OPEN', '#ffffff'], direct: ['DIRECT!', '#ff9ad5'], dump: ['DUMP!', '#c7d2ff'] };
-const FX = { bolts: [], lastState: null, cutin: null, cine: null, cracks: [], tags: [], parts: [], rings: [], pops: [], lines: [], shake: 0, flash: 0, zoom: 1, zx: 600, zy: 270, hype: 0, netWob: 0, trail: [], scoreBump: [0, 0], banner: null, lastEv: 0 };
+const FX = { bolts: [], lastState: null, cutin: null, cine: null, cracks: [], tags: [], parts: [], rings: [], pops: [], lines: [], shake: 0, flash: 0, zoom: 1, zx: W / 2, zy: 270, hype: 0, netWob: 0, trail: [], scoreBump: [0, 0], banner: null, lastEv: 0 };
 let bgCanvas = null, crowd = [];
 
 function buildBg() {
@@ -1275,7 +1315,7 @@ function handleEvent(e, me) {
         FX.flash = 0.9; FX.shake = 16; buzz(90); SFX.hype(1); FX.hype = 1;
         for (let i = 0; i < 3; i++) FX.rings.push({ x: e.x, y: e.y, r: 4 + i * 10, vr: 9 + i * 4, life: 26 + i * 6, max: 26 + i * 6, c: C[i], w: 7 - i * 2 });
         spawn(60, () => { const a = Math.random() * 6.28, v = 3 + Math.random() * 9; return { x: e.x, y: e.y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: 30 + Math.random() * 20, max: 50, c: C[(Math.random() * 3) | 0], s: 2 + Math.random() * 4, add: 1, g: 0.02 }; });
-        if (e.supT === 3) for (let i = 0; i < 4; i++) FX.bolts.push({ x: e.x + (Math.random() - 0.5) * 300, life: 22, seed: Math.random() * 99 });
+        if (e.supT === 3 || e.supT === 5) for (let i = 0; i < (e.supT === 5 ? 7 : 4); i++) FX.bolts.push({ x: e.x + (Math.random() - 0.5) * 300, life: 22, seed: Math.random() * 99 });
         break;
       }
       const sp = Math.hypot(e.vx || 1, e.vy || 1), ux = (e.vx || 1) / sp, uy = (e.vy || 0) / sp;
@@ -1296,6 +1336,17 @@ function handleEvent(e, me) {
     }
     case 'serve':
       SFX.play('serve', { q: e.q });
+      if (e.sup) {
+        const C = SUPC[7];
+        SFX.play('super'); SFX.play('boom');
+        FX.cine = { t: 0, x: e.x, y: e.y, ax: e.ax, ay: e.ay, team: e.team, dur: 100 };
+        FX.flash = 0.9; FX.shake = 18; buzz(90); SFX.hype(1); FX.hype = 1;
+        for (let i = 0; i < 4; i++) FX.rings.push({ x: e.x, y: e.y, r: 4 + i * 10, vr: 9 + i * 4, life: 26 + i * 6, max: 26 + i * 6, c: C[i % 3], w: 8 - i * 2 });
+        spawn(70, () => { const a = Math.random() * 6.28, v = 3 + Math.random() * 10; return { x: e.x, y: e.y, vx: Math.cos(a) * v + (e.vx || 0) * 0.3, vy: Math.sin(a) * v, life: 30 + Math.random() * 20, max: 50, c: C[(Math.random() * 3) | 0], s: 2 + Math.random() * 4, add: 1, g: 0.02 }; });
+        for (let i = 0; i < 18; i++) FX.lines.push({ y: Math.random() * H, len: 160 + Math.random() * 300, x: Math.random() * W, sp: 40 + Math.random() * 30, life: 16, dir: Math.sign(e.vx || 1) });
+        popText('CANNON!!', e.x, e.y - 50, '#ff6b8a', 44);
+        break;
+      }
       FX.rings.push({ x: e.x, y: e.y, r: 6, vr: 6, life: 14, max: 14, c: e.q === 2 ? GOLD : '#fff', w: 3 });
       if (e.kind === 'float') { if (e.q === 2) popText('FLOAT MAUT!', e.x, e.y - 40, '#c7d2ff', 28); }
       else if (e.q === 2) { popText('SERVIS MAUT!', e.x, e.y - 40, GOLD, 30); FX.shake = 8; FX.flash = 0.3; if (e.run) tag('RUNNING JUMP SERVE', e.x, e.y - 90, GOLD, 0.8); }
@@ -1361,7 +1412,7 @@ function handleEvent(e, me) {
       }
       break;
     }
-    case 'toss': SFX.play('toss'); if (e.kind === 'float') tag('FLOAT', e.x, e.y - 70, '#c7d2ff', 0.7); break;
+    case 'toss': SFX.play('toss'); if (e.kind === 'float') tag('FLOAT', e.x, e.y - 70, '#c7d2ff', 0.7); else if (e.ch >= 75) tag('HIGH TOSS!', e.x, e.y - 80, '#ff9ab8', 0.8); break;
     case 'jump':
       SFX.play('jump');
       spawn(e.big ? 12 : 7, () => ({ x: e.x + (Math.random() - 0.5) * 18, y: GY - 2, vx: (Math.random() - 0.5) * 3.5, vy: -Math.random() * 1.8, life: 22, max: 22, c: '#f3c89a', s: 2 + Math.random() * 2.5, g: 0.05 }));
@@ -1465,7 +1516,7 @@ function drawWorldBase(ctx, time) {
   ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 3;
   ctx.beginPath(); ctx.moveTo(LEFT, fy); ctx.lineTo(RIGHT, fy); ctx.stroke();
   ctx.lineWidth = 3;
-  for (const lx of [LEFT, RIGHT, NET, NET - 187, NET + 187]) { const sk = lx === LEFT ? -70 : lx === RIGHT ? 70 : (lx - NET) * 0.12; ctx.globalAlpha = lx === NET ? 0.9 : 0.75; ctx.beginPath(); ctx.moveTo(lx, fy); ctx.lineTo(lx + sk, H); ctx.stroke(); }
+  for (const lx of [LEFT, RIGHT, NET, NET - 150 * SC, NET + 150 * SC]) { const sk = lx === LEFT ? -70 : lx === RIGHT ? 70 : (lx - NET) * 0.12; ctx.globalAlpha = lx === NET ? 0.9 : 0.75; ctx.beginPath(); ctx.moveTo(lx, fy); ctx.lineTo(lx + sk, H); ctx.stroke(); }
   ctx.globalAlpha = 1;
   // pantulan lampu di lantai
   const gl = ctx.createLinearGradient(0, fy, 0, fy + 40); gl.addColorStop(0, 'rgba(255,240,210,0.22)'); gl.addColorStop(1, 'rgba(255,240,210,0)');
@@ -1745,10 +1796,12 @@ function drawCues(ctx, s, me, time, extra) {
   if (s.phase === 'serve' && s.serveTeam === me) {
     ctx.font = '600 15px "Chakra Petch", sans-serif'; ctx.textAlign = 'center'; ctx.fillStyle = 'rgba(255,255,255,0.9)';
     const fl = s.serveKind === 'float';
-    const hint = s.serveStage === 0 ? 'SPIKE = jump serve  ·  TIP = float serve' : fl ? 'Tahan SPIKE, lepas saat bola di tangan' : meA.ground ? 'Lari ke bawah bola, tekan & tahan SPIKE untuk lompat' : 'Tahan terus, lepas saat bola di tangan!';
+    const master = meA.cs && meA.cs.srv;
+    if (master) drawServeAim(ctx, s, me, meA, extra, time);
+    const hint = s.serveStage === 0 ? (master ? (s.tossCh > 0 ? 'Lepas SPIKE untuk melempar · joystick = arah lemparan' : 'TAHAN SPIKE = kekuatan lemparan · TIP = float') : 'SPIKE = jump serve  ·  TIP = float serve') : master && !meA.ground ? 'Joystick ↑ jauh · ↓ pendek · tahan = makin keras' : fl ? 'Tahan SPIKE, lepas saat bola di tangan' : meA.ground ? 'Lari ke bawah bola, tekan & tahan SPIKE untuk lompat' : 'Tahan terus, lepas saat bola di tangan!';
     const hx2 = clamp(meA.x + dir * 90, 240, W - 240);
     ctx.fillText(hint, hx2, meA.y - 150);
-    if (s.serveStage === 0) { ctx.font = '600 12px "Chakra Petch", sans-serif'; ctx.fillStyle = 'rgba(255,255,255,0.6)'; ctx.fillText('geser joystick untuk pindah posisi', hx2, meA.y - 132); }
+    if (s.serveStage === 0) { ctx.font = '600 12px "Chakra Petch", sans-serif'; ctx.fillStyle = 'rgba(255,255,255,0.6)'; ctx.fillText(master ? 'mundur dulu untuk ancang-ancang lari panjang' : 'geser joystick untuk pindah posisi', hx2, meA.y - 132); }
     if (s.serveStage === 1 && !meA.hitDone && meA.st !== 'windup' && (fl || !meA.ground)) {
       const d = Math.hypot(b.x - (meA.x + dir * 14), b.y - (meA.y - 100));
       const k = Math.max(0, 1 - d / 90);
@@ -1756,6 +1809,32 @@ function drawCues(ctx, s, me, time, extra) {
       ctx.beginPath(); ctx.arc(b.x, b.y, 12 + d * 0.5, 0, 6.283); ctx.stroke();
     }
   }
+}
+
+// SERVE MASTER: meteran lemparan + titik bidik servis
+function drawServeAim(ctx, s, me, a, extra, time) {
+  const dir = dirOf(me);
+  if (s.serveStage === 0 && s.tossCh > 0) {
+    const k = clamp((s.tossCh - 1) / 36, 0, 1), x = a.x - dir * 34, y0 = a.y - 20, hgt = 90;
+    ctx.fillStyle = 'rgba(10,12,36,0.75)'; ctx.fillRect(x - 6, y0 - hgt - 2, 12, hgt + 4);
+    const gr = ctx.createLinearGradient(0, y0, 0, y0 - hgt); gr.addColorStop(0, '#ff6b8a'); gr.addColorStop(1, GOLD);
+    ctx.fillStyle = gr; ctx.fillRect(x - 4, y0 - hgt * k, 8, hgt * k);
+    ctx.font = '700 11px Bungee, Impact, sans-serif'; ctx.textAlign = 'center'; ctx.fillStyle = k >= 1 ? GOLD : '#fff';
+    ctx.fillText(k >= 1 ? 'MAX' : 'TOSS', x, y0 - hgt - 8);
+  }
+  const u = clamp(-(extra.aim || 0), -1, 1);
+  const tx = serveAimX(me, u), pu = 0.6 + Math.sin(time * 0.012) * 0.25;
+  ctx.save(); ctx.globalAlpha = pu; ctx.strokeStyle = '#ff9ab8'; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.ellipse(tx, GY + 4, 34, 8, 0, 0, 6.283); ctx.stroke();
+  ctx.beginPath(); ctx.ellipse(tx, GY + 4, 14, 3.5, 0, 0, 6.283); ctx.stroke();
+  ctx.setLineDash([6, 8]); ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(a.x + dir * 20, a.y - 150); ctx.quadraticCurveTo((a.x + tx) / 2, 120, tx, GY - 4); ctx.stroke(); ctx.setLineDash([]);
+  const bx = clamp(tx, 90, W - 90), by = GY - 150 - Math.sin(time * 0.008) * 6;
+  const gb = ctx.createLinearGradient(0, GY, 0, by); gb.addColorStop(0, 'rgba(255,107,138,0.55)'); gb.addColorStop(1, 'rgba(255,107,138,0)');
+  ctx.globalAlpha = 1; ctx.fillStyle = gb; ctx.fillRect(tx - 5, by, 10, GY - by);
+  ctx.font = '700 16px Bungee, Impact, sans-serif'; ctx.textAlign = 'center'; ctx.lineWidth = 4; ctx.strokeStyle = '#141428';
+  const lbl = '▼ ' + (u > 0.4 ? 'DALAM' : u < -0.4 ? 'PENDEK' : 'TENGAH');
+  ctx.strokeText(lbl, bx, by - 6); ctx.fillStyle = '#ff9ab8'; ctx.fillText(lbl, bx, by - 6);
+  ctx.restore();
 }
 
 function drawFXWorld(ctx) {
@@ -1949,7 +2028,11 @@ const LOOKS = [
   // tim biru
   { hair: '#5fb2ff', hairD: '#1f6fd1', hairL: '#c8e6ff', eye: '#35d0e8', eyeD: '#0b5a6e', style: 'spiky', brow: 0.3, mouth: 'shout' },
   { hair: '#1c1b2b', hairD: '#0a0a14', hairL: '#4a4870', eye: '#a57cff', eyeD: '#3d1f80', style: 'long', brow: 0.2, mouth: 'smirk' },
-  { hair: '#d7d9e6', hairD: '#9a9db3', hairL: '#ffffff', eye: '#ffc93d', eyeD: '#7a5200', style: 'sweep', brow: 0.3, mouth: 'grin' }
+  { hair: '#d7d9e6', hairD: '#9a9db3', hairL: '#ffffff', eye: '#ffc93d', eyeD: '#7a5200', style: 'sweep', brow: 0.3, mouth: 'grin' },
+  // karakter baru
+  { hair: '#d6265a', hairD: '#8c0f37', hairL: '#ff9ab8', eye: '#ffd23f', eyeD: '#8a5a00', style: 'sweep', brow: 0.34, mouth: 'smirk' },
+  { hair: '#2fc79a', hairD: '#0d7a5a', hairL: '#a8ffe2', eye: '#ff9b3d', eyeD: '#7a3a00', style: 'spiky', brow: 0.3, mouth: 'shout' },
+  { hair: '#4ff0ff', hairD: '#0b8fb3', hairL: '#e0ffff', eye: '#ffe94a', eyeD: '#8a6a00', style: 'messy', brow: 0.36, mouth: 'grin' }
 ];
 const PORTRAITS = {};
 const INK = '#16121f';
@@ -2378,14 +2461,15 @@ showRank();
 let charNext = null;
 function buildCharGrid() {
   const g = $('charGrid'); g.innerHTML = '';
-  CHARS.forEach((c, i) => {
+  const order = CHARS.map((c, i) => i).sort((x, y) => (CHARS[y].perk ? 1 : 0) - (CHARS[x].perk ? 1 : 0));
+  order.forEach(i => { const c = CHARS[i];
     const b = document.createElement('button'); b.type = 'button'; b.className = 'card' + (settings.char === i ? ' sel' : ''); b.dataset.i = i;
     const img = getPortrait('sel' + i, { team: 0, skin: c.skin, num: c.num, look: i });
     const cv = document.createElement('canvas'); cv.width = 210; cv.height = 150; cv.className = 'face';
     cv.getContext('2d').drawImage(img, 30 * 2, 20 * 2, 360 * 2, 257 * 2, 0, 0, 210, 150);
     b.appendChild(cv);
     const bars = [['LARI', c.spd], ['LOMPAT', c.jmp], ['SPIKE', c.pow], ['TERIMA', c.rcv], ['BLOK', c.blk]].map(([n, v]) => '<i><em>' + n + '</em><b style="width:' + Math.round(clamp((v - 0.8) / 0.55, 0.1, 1) * 100) + '%"></b></i>').join('');
-    b.insertAdjacentHTML('beforeend', '<span class="cn">' + c.name + ' <small>#' + c.num + '</small></span><span class="cr">' + c.role + '</span><span class="bars">' + bars + '</span><span class="sp">' + c.spName + '</span><span class="sd">' + c.spDesc + '</span>');
+    b.insertAdjacentHTML('beforeend', '<span class="cn">' + c.name + ' <small>#' + c.num + '</small></span><span class="cr">' + c.role + (c.perk ? ' <u>BARU</u>' : '') + '</span><span class="bars">' + bars + '</span><span class="sp">' + c.spName + '</span><span class="sd">' + c.spDesc + '</span>' + (c.perk ? '<span class="pk">★ ' + c.perk + '</span>' : ''));
     g.appendChild(b);
   });
 }
@@ -2496,6 +2580,7 @@ function onMq(c, m) {
     if (m.f !== net.peer) return;
   } else {
     if (m.k === 'busy') { netErr('Room ' + net.code + ' sudah penuh.'); return; }
+    if (!net.peer && m.k !== 'welcome' && (m.k === 'setup' || m.k === 'sdp' || m.k === 'ice' || m.k === 's')) { net.peer = m.f; lockBroker(c); clearInterval(net.helloT); net.via = 'relay'; }
     if (m.k === 'welcome') { if (!net.peer) { net.peer = m.f; lockBroker(c); clearInterval(net.helloT); net.via = 'relay'; netStatus('Tersambung! Menyiapkan pertandingan…'); } net.lastRx = performance.now(); return; }
     if (m.f !== net.peer) return;
   }
@@ -2568,8 +2653,8 @@ function startHost() {
 function hostRematch() { remoteConsumed = remoteIn ? Object.assign({}, remoteIn.c) : remoteConsumed; startHost(); sendNet({ k: 'rematch-go' }); }
 function onHostData(m) {
   if (!m) return;
-  if (m.k === 'in') { if (!remoteIn) remoteConsumed = Object.assign({}, m.c); remoteIn = m; }
-  else if (m.k === 'hello') { guestAssist = !!m.assist; guestChar = clamp(m.char | 0, 0, 5); if (mode !== 'host') startHost(); }
+  if (m.k === 'in') { if (remoteIn && m.q != null && remoteIn.q != null && m.q <= remoteIn.q && remoteIn.q - m.q < 1e5) return; if (!remoteIn) remoteConsumed = Object.assign({}, m.c); remoteIn = m; }
+  else if (m.k === 'hello') { guestAssist = !!m.assist; guestChar = clamp(m.char | 0, 0, CHARS.length - 1); if (mode !== 'host') startHost(); }
   else if (m.k === 'ping') sendNet({ k: 'pong', t: m.t });
   else if (m.k === 'rematch') { if (S && S.phase === 'over') hostRematch(); }
 }
@@ -2603,10 +2688,10 @@ $('joinForm').addEventListener('submit', e => {
 $('netBack').onclick = () => { closeNet(); show('pMain'); };
 setInterval(() => { if ((mode === 'host' || mode === 'guest') && net.lastRx && performance.now() - net.lastRx > 7000) onDisconnect(); }, 1000);
 
-let guestPrev = null, guestCur = null, guestCurT = 0, guestSendAcc = 0, pingAcc = 0;
+let guestPrev = null, guestCur = null, guestCurT = 0, guestSendAcc = 0, pingAcc = 0, lastInSig = '', inSeq = 0, setupAcc = 0;
 function startGuest() {
   SFX.init(); goFull(); resetFX();
-  guestPrev = guestCur = null; GS = null; snapBuf.length = 0; pred.x = null;
+  guestPrev = guestCur = null; GS = null; snapBuf.length = 0; pred.x = null; pred.air = false; NX.prev = null; NX.snap = null; NX.clk = null; NX.clkT = 0;
   mode = 'guest'; paused = false; show(null); setHUD(true); resize();
 }
 const snapBuf = [];
@@ -2614,10 +2699,11 @@ function onGuestData(m) {
   if (!m) return;
   if (m.k === 's') {
     const u = unpack(m); u.rt = performance.now();
+    const lastS = snapBuf[snapBuf.length - 1]; if (lastS && u.tick < lastS.tick && lastS.tick - u.tick < 600) return; // paket telat (kanal cepat tak berurutan)
     snapBuf.push(u); if (snapBuf.length > 30) snapBuf.shift();
     guestCur = u; if (u.phase !== 'over') $('overMsg').textContent = '';
   }
-  else if (m.k === 'pong') pingMs = Math.round(performance.now() - m.t);
+  else if (m.k === 'pong') { const r = performance.now() - m.t; pingMs = Math.round(pingMs == null ? r : pingMs * 0.75 + r * 0.25); }
   else if (m.k === 'setup') { TEMPLATE = newState({ target: m.target, bestOf: m.bestOf, chars: m.chars, ctrl: ['human', 'human'], seed: 1 }); if (mode !== 'guest') startGuest(); else { resetFX(); snapBuf.length = 0; show(null); } }
   else if (m.k === 'rematch-go') { resetFX(); snapBuf.length = 0; show(null); }
 }
@@ -2631,45 +2717,107 @@ const r1 = v => Math.round(v * 10) / 10;
 function pack(s) {
   return {
     k: 's', t: s.tick, ph: s.phase, sc: s.score, tg: s.target, sv: s.serveTeam, fz: s.freeze, ss: s.serveStage, tc: s.touches,
-    fv: s.fever, rn: s.rallyN, sk: s.serveKind, ft: s.firstTouch, sets: s.sets, bo: s.bestOf, sn: s.setNo,
+    sl: s.slow, tch: s.tossCh || 0, fv: s.fever, rn: s.rallyN, sk: s.serveKind, ft: s.firstTouch, sets: s.sets, bo: s.bestOf, sn: s.setNo,
     stx: s.phase === 'over' ? s.stats : undefined, mr: s.maxRally, ch: s.chars,
     b: [r1(s.ball.x), r1(s.ball.y), r1(s.ball.vx), r1(s.ball.vy), r1(s.ball.spin), s.ball.held ? 1 : 0, s.ball.fast, s.ball.perfect, s.ball.side, s.ball.sup, s.ball.flt],
-    a: s.ath.map(a => [r1(a.x), r1(a.y), r1(a.vx), STN.indexOf(a.st), a.swingAge, a.land, a.dive, a.cele, r1(a.runPh), a.hitDone ? 1 : 0, a.flip, a.wind]),
+    a: s.ath.map(a => [r1(a.x), r1(a.y), r1(a.vx), STN.indexOf(a.st), a.swingAge, a.land, a.dive, a.cele, r1(a.runPh), a.hitDone ? 1 : 0, a.flip, a.wind, r1(a.vy)]),
     ev: s.events.slice(-14)
   };
 }
 let TEMPLATE = newState({ target: 5, ctrl: ['human', 'human'], seed: 1 });
 function unpack(m) {
-  const s = { tick: m.t, phase: m.ph, score: m.sc, target: m.tg, serveTeam: m.sv, freeze: m.fz, serveStage: m.ss, touches: m.tc, events: m.ev,
+  const s = { slow: m.sl || 0, tossCh: m.tch || 0, tick: m.t, phase: m.ph, score: m.sc, target: m.tg, serveTeam: m.sv, freeze: m.fz, serveStage: m.ss, touches: m.tc, events: m.ev,
     fever: m.fv || [0, 0], rallyN: m.rn || 0, sets: m.sets || [0, 0], bestOf: m.bo || 1, setNo: m.sn || 1, stats: m.stx, maxRally: m.mr || 0, chars: m.ch || [0, 3], serveKind: m.sk || 'jump', firstTouch: m.ft || [-1, -1],
     ball: { x: m.b[0], y: m.b[1], vx: m.b[2], vy: m.b[3], spin: m.b[4], held: !!m.b[5], fast: m.b[6], perfect: m.b[7], side: m.b[8], sup: m.b[9] || 0, flt: m.b[10] || 0 },
-    ath: TEMPLATE.ath.map((t, i) => { const r = m.a[i]; return Object.assign({}, t, { x: r[0], y: r[1], vx: r[2], st: STN[r[3]] || 'idle', swingAge: r[4], land: r[5], dive: r[6], cele: r[7], runPh: r[8], hitDone: !!r[9], flip: r[10] || 0, wind: r[11] || 0, ground: r[1] >= GY - 0.5 }); }) };
+    ath: TEMPLATE.ath.map((t, i) => { const r = m.a[i]; return Object.assign({}, t, { x: r[0], y: r[1], vx: r[2], st: STN[r[3]] || 'idle', swingAge: r[4], land: r[5], dive: r[6], cele: r[7], runPh: r[8], hitDone: !!r[9], flip: r[10] || 0, wind: r[11] || 0, vy: r[12] || 0, ground: r[1] >= GY - 0.5 }); }) };
   return s;
 }
-const pred = { x: null, vx: 0 };
+// ---- tampilan guest: ekstrapolasi ke "waktu host saat input kita tiba" ----
+// Guest melihat bola di posisi yang sama dengan saat host menilai tombolnya, jadi timing spike tidak meleset karena ping.
+const pred = { x: null, vx: 0, y: null, vy: 0, air: false, lastCnt: 0 };
+const NX = { snap: null, ball: { x: 0, y: 0 }, ath: [], off: null, lastT: 0, lead: 0 };
+function extrapBall(b, k, fz, sl) {
+  const o = { x: b.x, y: b.y, vx: b.vx, vy: b.vy };
+  if (b.held) return o;
+  let t = Math.max(0, k - (fz || 0)), slow = sl || 0;
+  while (t > 0.001) {
+    let dt = Math.min(1, t); t -= dt;
+    if (slow > 0) { slow -= dt; dt *= 0.3; }
+    o.vy += G * dt; const px = o.x, py = o.y; o.x += o.vx * dt; o.y += o.vy * dt;
+    if ((px - NET) * (o.x - NET) <= 0 && px !== o.x) {
+      const f = (NET - px) / (o.x - px), yc = py + (o.y - py) * f;
+      if (yc > NT + 2) { const from = px < NET ? -1 : 1; o.x = NET + from * (BR + 4); o.vx = -o.vx * 0.22 + from * 0.6; o.vy *= 0.5; }
+    }
+    if (o.y >= GY - BR) { o.y = GY - BR; o.vy = -Math.abs(o.vy) * 0.45; o.vx *= 0.7; if (Math.abs(o.vy) < 1.2) o.vy = 0; }
+    if (o.x < BR) { o.x = BR; o.vx = Math.abs(o.vx) * 0.5; } if (o.x > W - BR) { o.x = W - BR; o.vx = -Math.abs(o.vx) * 0.5; }
+  }
+  return o;
+}
+function extrapAth(a, k, fz) {
+  const t = Math.max(0, Math.round(k - (fz || 0)));
+  let x = a.x, y = a.y, vy = a.vy || 0, vx = a.vx;
+  for (let i = 0; i < t; i++) {
+    if (y < GY - 0.5) { vy += Math.abs(vy) < 2.2 ? AG * 0.5 : AG; y += vy; x += vx; if (y >= GY) { y = GY; vx *= 0.4; } }
+    else { vx *= 0.9; x += vx; }
+  }
+  x = a.team === 0 ? clamp(x, 24, NET - 20) : clamp(x, NET + 20, W - 24);
+  return { x, y };
+}
 function guestView() {
   if (!snapBuf.length) return null;
-  const rt = performance.now() - 75;
-  let a = snapBuf[0], b = snapBuf[snapBuf.length - 1];
-  for (let i = snapBuf.length - 1; i > 0; i--) { if (snapBuf[i - 1].rt <= rt) { a = snapBuf[i - 1]; b = snapBuf[i]; break; } }
-  const span = b.rt - a.rt, k = span > 0 ? clamp((rt - a.rt) / span, 0, 1) : 1;
-  const L = (p, q) => p + (q - p) * k;
-  const v = Object.assign({}, b);
-  v.events = guestCur.events;
-  v.ball = Object.assign({}, b.ball);
-  if (!a.ball.held && !b.ball.held && Math.abs(b.ball.x - a.ball.x) < 90) { v.ball.x = L(a.ball.x, b.ball.x); v.ball.y = L(a.ball.y, b.ball.y); }
-  v.ath = b.ath.map((q, i) => { const p = a.ath[i]; if (Math.abs(p.x - q.x) > 70) return q; return Object.assign({}, q, { x: L(p.x, q.x), y: L(p.y, q.y) }); });
-  // prediksi gerak atlet sendiri (sumbu x) supaya analog terasa langsung
-  const meA = v.ath[3], latest = guestCur.ath[3];
-  if (pred.x === null || Math.abs(pred.x - latest.x) > 80 || guestCur.phase !== 'rally') { pred.x = meA.x; pred.vx = 0; }
-  else {
-    if (latest.ground && latest.st !== 'dive') {
-      const tv = clamp(local.r - local.l + local.jx, -1, 1) * 5;
-      pred.vx += (tv - pred.vx) * 0.3; pred.x = clamp(pred.x + pred.vx, NET + 20, W - 24);
-      pred.x += (latest.x - pred.x) * 0.12;
-    } else pred.x += (meA.x - pred.x) * 0.35;
-    meA.x = pred.x;
+  const L = snapBuf[snapBuf.length - 1], now = performance.now();
+  const ping = pingMs == null ? 90 : pingMs;
+  // jam-tick host yang halus: maju tiap frame, dikoreksi pelan ke perkiraan dari paket terbaru (meredam jitter jaringan)
+  const sample = L.tick + Math.min(250, now - L.rt) / STEP;
+  const dtc = NX.clkT ? (now - NX.clkT) / STEP : 0; NX.clkT = now;
+  if (NX.clk == null || Math.abs(sample - NX.clk) > 12) NX.clk = sample;
+  else { NX.clk += Math.min(dtc, 4); NX.clk += (sample - NX.clk) * 0.06; }
+  if (NX.clk < L.tick) NX.clk = L.tick;
+  const lead = clamp(NX.clk - L.tick + ping / STEP, 0, 26);
+  NX.lead = lead;
+  const v = Object.assign({}, L);
+  v.events = L.events;
+  const eb = extrapBall(L.ball, lead, L.freeze, L.slow);
+  v.ball = Object.assign({}, L.ball, { x: eb.x, y: eb.y, vx: eb.vx, vy: eb.vy });
+  v.ath = L.ath.map(a => Object.assign({}, a, extrapAth(a, lead, L.freeze)));
+  // koreksi halus: saat snapshot baru datang, selisih posisi dilebur pelan-pelan, bukan meloncat
+  const dtk = clamp((now - (NX.lastT || now)) / 16.67, 0, 4); NX.lastT = now;
+  const ents = [v.ball].concat(v.ath);
+  if (!NX.off || NX.off.length !== ents.length) NX.off = ents.map(() => ({ x: 0, y: 0 }));
+  if (NX.snap && NX.snap !== L) {
+    // bandingkan dengan perkiraan snapshot lama di waktu yang sama -> selisih murni koreksi, bukan gerak normal
+    const O = NX.snap, lo = lead + (L.tick - O.tick);
+    const ob = extrapBall(O.ball, lo, O.freeze, O.slow), oents = [ob].concat(O.ath.map(a => extrapAth(a, lo, O.freeze)));
+    ents.forEach((e, i) => {
+      const p = oents[i]; if (!p) return; const dx = p.x - e.x, dy = p.y - e.y;
+      const big = Math.hypot(dx, dy) > (i === 0 ? 90 : 70) || (i === 0 && (L.ball.held || O.ball.held)) || L.phase !== O.phase;
+      NX.off[i] = big ? { x: 0, y: 0 } : { x: NX.off[i].x + dx, y: NX.off[i].y + dy };
+    });
   }
+  NX.snap = L;
+  const dec = Math.pow(0.78, dtk);
+  ents.forEach((e, i) => { const o = NX.off[i]; o.x *= dec; o.y *= dec; e.x += o.x; e.y += o.y; });
+  // prediksi atlet sendiri: lari & lompat langsung mengikuti tombol, lalu menyatu dengan data host
+  const meA = v.ath[3], hostMe = extrapAth(L.ath[3], lead, L.freeze);
+  const live = L.phase === 'rally' || L.phase === 'serve';
+  if (pred.x === null || !live || Math.abs(pred.x - hostMe.x) > 90) { pred.x = meA.x; pred.vx = 0; }
+  else if (L.ath[3].ground && L.ath[3].st !== 'dive') {
+    const cs = meA.cs || { spd: 1 };
+    const tv = clamp(local.r - local.l + local.jx, -1, 1) * 6.4 * CK * (cs.spd || 1);
+    pred.vx += (tv - pred.vx) * Math.min(1, 0.3 * dtk); pred.x = clamp(pred.x + pred.vx * dtk, NET + 20, W - 24);
+    pred.x += (hostMe.x - pred.x) * Math.min(1, 0.08 * dtk);
+    meA.x = pred.x;
+  } else { pred.x += (meA.x - pred.x) * Math.min(1, 0.35 * dtk); meA.x = pred.x; }
+  const pressed = local.cnt.spike !== pred.lastCnt; pred.lastCnt = local.cnt.spike;
+  if (live && pressed && !pred.air && meA.y >= GY - 1 && L.ath[3].ground) { pred.air = true; pred.y = GY; pred.vy = -10.9 * ((meA.cs && meA.cs.jmp) || 1); pred.t = 0; }
+  if (pred.air) {
+    pred.t += dtk;
+    const held = (local.shK || local.shT) && pred.vy < 0 && pred.t <= 16;
+    pred.vy += (held || Math.abs(pred.vy) < 2.2 ? AG * 0.5 : AG) * dtk; pred.y += pred.vy * dtk;
+    if (pred.y >= GY || (!L.ath[3].ground && pred.t > lead + 6) || pred.t > 90) pred.air = false;
+    else { meA.y = Math.min(meA.y, pred.y); meA.ground = false; if (meA.st === 'idle' || meA.st === 'run') meA.st = 'air'; }
+  }
+  NX.prev = ents.map(e => ({ x: e.x, y: e.y })); NX.view = v;
   return v;
 }
 
@@ -2703,7 +2851,8 @@ function tickOnce() {
   if (mode === 'ai') step(S, [sampleLocal(), null]);
   else if (mode === 'host') {
     step(S, [sampleLocal(), sampleRemote()]);
-    if (++snapAcc >= (net.via === 'p2p' ? 2 : 3)) { snapAcc = 0; sendNet(pack(S)); }
+    if (++snapAcc >= 2) { snapAcc = 0; sendNet(pack(S)); }
+    if (!remoteIn && ++setupAcc % 60 === 0) sendNet({ k: 'setup', chars: S.chars, target: S.baseTarget, bestOf: S.bestOf }); // ulangi kalau paket awal hilang
   }
 }
 function frame(now) {
@@ -2715,9 +2864,11 @@ function frame(now) {
     if (acc > STEP) acc = STEP;
   } else if (mode === 'guest') {
     guestSendAcc += dt;
-    const gstep = net.via === 'p2p' ? STEP : STEP * 2;
-    while (guestSendAcc >= gstep) { guestSendAcc -= gstep; const I = sampleLocal(); sendNet({ k: 'in', mx: r1(I.mx), my: r1(I.my), bh: I.bh, sh: I.sh, c: Object.assign({}, local.cnt) }); }
-    pingAcc += dt; if (pingAcc > 1000) { pingAcc = 0; sendNet({ k: 'ping', t: performance.now() }); }
+    const I = sampleLocal();
+    const msg = { k: 'in', mx: r1(I.mx), my: r1(I.my), bh: I.bh, sh: I.sh, c: Object.assign({}, local.cnt) };
+    const sig = JSON.stringify(msg);
+    if (sig !== lastInSig || guestSendAcc >= 50) { lastInSig = sig; guestSendAcc = 0; msg.q = ++inSeq; sendNet(msg); }
+    pingAcc += dt; if (pingAcc > 500) { pingAcc = 0; sendNet({ k: 'ping', t: performance.now() }); }
   }
   draw(now);
 }
